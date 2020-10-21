@@ -1,6 +1,7 @@
-### This is a work in progress
+#RancilioBrain
+##### This is a work in progress
 
-# Interface Parts
+## Interface Parts
 ![InstallationRender](https://i.imgur.com/howaFJhh.png)
 ![partStack](https://i.imgur.com/dXTC4qBh.jpg)
 
@@ -16,9 +17,12 @@ You certainly dont need to puchase these components from amazon, you can find th
 11 [2.54mm Pitch Screw Terminals](https://www.amazon.com/gp/product/B07NSJV6NW/ref=ppx_yo_dt_b_search_asin_title?ie=UTF8&psc=1)
 
 
-# Other Parts
+## Other Parts
 ![SSRs](https://i.imgur.com/JKYPX55h.jpg)
 
 Besides the enclosure assembly, you will need suitable wire, various [spade connectors](https://www.amazon.com/gp/product/B078PMWNJC/ref=ppx_yo_dt_b_search_asin_title?ie=UTF8&psc=1) and 2 quality [40A Relays](https://www.amazon.com/gp/product/B00E1LC1VK/ref=ppx_yo_dt_b_search_asin_title?ie=UTF8&psc=1). I've used 200ºC Temp resistant silicone wire for all lengths runnning inside the machine, [18AWG](https://www.amazon.com/gp/product/B0746HMTPP/ref=ppx_yo_dt_b_search_asin_title?ie=UTF8&psc=1) for the relays and [22AWG](https://www.amazon.com/gp/product/B01M0O1NXM/ref=ppx_yo_dt_b_search_asin_title?ie=UTF8&psc=1) for the 5V signal wires.
+
+##Circuitry
 ![wiring diagram](https://i.imgur.com/Tp9VdDOh.jpg)
+
 You will also need to reroute the ground to the 3 way valve so that solenoid if you plan to have solenoid control independent of pump control like I do. Otherwise just piggyback the poles of the brew switch.

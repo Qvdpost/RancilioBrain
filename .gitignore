@@ -3,3 +3,6 @@
 
 # IDE meta files
 .idea
+
+# Fish folder
+$HOME
