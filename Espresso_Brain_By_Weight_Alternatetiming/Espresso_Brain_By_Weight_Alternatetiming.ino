@@ -19,16 +19,22 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
 // Scale setup
 HX711 scale;
+HX711 scale2;
 uint8_t dataPin = 5;
 uint8_t clockPin = 6;
+uint8_t dataPin2 = 11;
+uint8_t clockPin2 = 12;
 // This is the calibration value for each load cell, you need to calibrate
 // them with a known weight The good thing is that the value is linear so if
 // you know something weights 100g you can calculate what the value should be.
-#define scaleCalibration 178
+#define scaleCalibration 884
+#define scaleCalibration2 956
+
 
 
 // the variable to hold a value for each load cell (float because it is a decimal)
 float w1;
+float w2;
 
 // Weight control variables
 int currentWeight;
@@ -39,23 +45,26 @@ int weightOffset = 0; // This value is how many decigrams before the target shou
 
 
 /*
- * Macros and globals needed for the offset hashtable based on flowrate
- */
+   Macros and globals needed for the offset hashtable based on flowrate
+*/
 // The interval over which the flow is calculated
-#define flowTime 2 
+#define flowTime 2
 // Maximum flowrate to remember offset for in centigrams per second
-#define maxFlow 500 
+#define maxFlow 500
 // Flow rate bucketsize in centigrams per second
-#define flowInterval 20 
+#define flowInterval 20
 // starting postion in EEPROM to write the offset hashtable
-#define hashOffset 10 
+#define hashOffset 10
 // Delta in offsets to warrant a new write to EEPROM
 #define offsetPrecision 20
 
 int hashMax = maxFlow / flowInterval;
 int hashStep = flowInterval;
 int weightFlow[flowTime] = {0};
+
+// Flow of coffee measured as centigram per flowTime - 1
 int currentFlow;
+int lastFlow;
 
 
 
@@ -93,14 +102,17 @@ bool turnDetected = false;
 
 // The Relays
 int pump = 9;
+int valve = 10;
 
 // Helper functions that turn the relays on and off
 void extractOn() {
   digitalWrite(pump, HIGH);
+  digitalWrite(valve, HIGH);
 }
 
 void extractOff() {
   digitalWrite(pump, LOW);
+  digitalWrite(valve, LOW);
 }
 
 
@@ -141,7 +153,7 @@ void preStartedDisplay() {
     display.setTextSize(1);
     display.setTextColor(SSD1306_WHITE); // Draw white text
     display.setCursor(98, 56);
-    display.print(tV, 1);
+    display.print(tV / 1000.0, 1);
   }
 }
 
@@ -173,7 +185,7 @@ void startedDisplay() {
   display.setTextSize(2);
   display.setTextColor(SSD1306_WHITE); // Draw white text
   display.setCursor(80, 46);
-  display.print(tV, 1);
+  display.print(tV / 1000.0, 1);
 }
 
 /*
@@ -204,7 +216,7 @@ void justEndedDisplay() {
   display.setTextSize(2);
   display.setTextColor(SSD1306_WHITE); // Draw white text
   display.setCursor(80, 46);
-  display.print(tV, 1);
+  display.print(tV / 1000.0, 1);
 
 }
 
@@ -308,11 +320,12 @@ void setup() {
   else {
     EEPROM.get(0, storedWeight);
   }
-  // DEPRECATED: This is a trick to convert our int back into a float, eeprom floats cant go very high because you only have like a byte so we store the weight as an int and convert it back
+
   targetWeight = storedWeight;
 
   // setting up the relays
   pinMode(pump, OUTPUT);
+  pinMode(valve, OUTPUT);
 
   // making sure the pump and valve are off, probably dont need but just in case
   extractOff();
@@ -331,12 +344,15 @@ void setup() {
 
   // This initializes the scales
   scale.begin(dataPin, clockPin);
+  scale2.begin(dataPin2, clockPin2);
 
   // Calibrate to initially weighted value
   scale.set_scale(scaleCalibration);
+  scale2.set_scale(scaleCalibration2);
 
   // set the scales to 0
   scale.tare();
+  scale2.tare();
 
   // Set the state of the system
   preStarted = true;
@@ -363,11 +379,11 @@ void loop() {
 
   // Updates the time and weight value while the extraction is happening
   if (started) {
+    updateWeightFlow();
     if (!weightReached) {
       elapsedTime = currentTime - startCounting;
       tV = elapsedTime;
       previousTime = currentTime;
-      updateWeightFlow();
       display.clearDisplay();
       startedDisplay();
       display.display();
@@ -383,6 +399,9 @@ void loop() {
     if (currentWeight > lastWeight) {
       lastWeight = currentWeight;
     }
+    if (lastFlow == 0) {
+      lastFlow = currentFlow;
+    }
   }
 
   // Goes back to the initial standby screen when you are finished extracting so you can set another weight
@@ -397,7 +416,7 @@ void loop() {
   // sometimes you need to reposition your cup and that would trip
   // the weight and stop extraction and ruin your shot :(
 
-  if (tV > 5) {
+  if (tV > 5000) {
     readWeightOffset();
     if ((currentWeight) > (targetWeight - weightOffset)) {
       lastWeight = currentWeight;
@@ -415,13 +434,13 @@ void loop() {
      e.g you can change it to 5s if you update your reached interval value to 5000 at the top.
      currentTime - previousTime >= reachedInterval
   */
-  if (weightReached && currentFlow < 0.2) {
+  if (weightReached && currentFlow < 10) {
     started = 0;
     weightReached = false;
     preStarted = true;
-    if (currentFlow < 0.2) {
-      writeWeightOffset();
-    }
+    writeWeightOffset();
+    clearWeightFlow();
+    lastFlow = 0;
     currentWeight = 0;
   }
 }
@@ -438,8 +457,11 @@ void loop() {
 */
 void scaleFunc() {
   w1 = scale.get_units();
-  if ((w1) > 1) {
-    currentWeight = round(w1 * 100);
+  w2 = scale2.get_units();
+  Serial.print(w1);
+  Serial.println(w2);
+  if ((w1 + w2) > 1) {
+    currentWeight = round((w1 * 100 + w2 * 100) / 2);
   }
 }
 
@@ -448,7 +470,8 @@ void scaleFunc() {
 */
 void precisionScale() {
   w1 = scale.get_units(2);
-  currentWeight = round(w1 * 100);
+  w2 = scale2.get_units(2);
+  currentWeight = round((w1 * 100 + w2 * 100) / 2);
 }
 
 /*
@@ -456,6 +479,7 @@ void precisionScale() {
 */
 void tareScales() {
   scale.tare();
+  scale2.tare();
 }
 
 /*
@@ -470,7 +494,16 @@ void updateWeightFlow() {
 }
 
 /*
-   Returns the flow over an interval of N
+   Clears the weightFlow array for a new extraction
+*/
+void clearWeightFlow() {
+  for (int i = 0; i < flowTime; i++) {
+    weightFlow[i] = 0;
+  }
+}
+
+/*
+   Returns the flow over an interval of N seconds (measurements taken at the start of each second)
 */
 void calcCurrentWeightFlow() {
   int minVal = weightFlow[0];
@@ -480,6 +513,9 @@ void calcCurrentWeightFlow() {
     minVal = min(minVal, weightFlow[i]);
     maxVal = max(maxVal, weightFlow[i]);
   }
+
+  // Average weight difference over interval flowTime
+  // (e.g. when flowTime is 2 you have measured 1 second of weight difference)
   currentFlow = (maxVal - minVal) / (flowTime - 1);
 }
 
@@ -492,24 +528,33 @@ uint8_t hashFlow() {
 }
 
 /*
- * Reads the weightOffset from EEPROM memory related to the current flowrate
- */
-void readWeightOffset() {
-  int offset = EEPROM.read(hashFlow());
-  weightOffset = offset != 255 ? offset : 0;
+   Calculates an index in EEPROM memory based on the last flowrate during extraction
+*/
+uint8_t hashLastFlow() {
+  uint8_t hash = (lastFlow / hashStep);
+  return (hash < hashMax ? hash : hashMax) + hashOffset;
 }
 
 /*
- * Writes the final weight overflow (drip) to EEPROM memory based on the flowrate 
- * before target weight was reached
- */
+   Reads the weightOffset from EEPROM memory related to the current flowrate
+*/
+void readWeightOffset() {
+  int offset = EEPROM.read(hashFlow());
+  // Convert offset from decigrams to centigrams
+  weightOffset = offset != 255 ? offset * 10 : 0;
+}
+
+/*
+   Writes the final weight overflow (drip) to EEPROM memory based on the flowrate
+   before target weight was reached
+*/
 void writeWeightOffset() {
-  uint8_t offset = EEPROM.read(hashFlow());
-  int currentOffset = currentWeight - lastWeight;
+  uint8_t offset = EEPROM.read(hashLastFlow());
+  int currentOffset = currentWeight - targetWeight;
 
   /* The final weight was less than the weight during extraction (e.g. someone took away the cup)
-   * Or the overflow too great (e.g. someone leaned on the scale)
-   */
+     Or the overflow too great (e.g. someone leaned on the scale)
+  */
   if (currentOffset <= 0 || currentOffset > 1.5 * targetWeight) {
     return;
   }
@@ -518,6 +563,8 @@ void writeWeightOffset() {
 
   // Write the average of both values to EEPROM in decigrams
   if (abs(deltaOffset) > offsetPrecision) {
-    EEPROM.write(hashFlow(), ((currentOffset + offset) / 2) / 10);
+    int writeOffset = ((currentOffset + offset) / 2) / 10;
+    writeOffset = writeOffset != 255 ? writeOffset : 254;
+    EEPROM.write(hashLastFlow(), writeOffset);
   }
 }

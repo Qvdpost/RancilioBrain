@@ -6,3 +6,6 @@
 
 # Fish folder
 $HOME
+
+# Freecad files
+*.FCStd*
