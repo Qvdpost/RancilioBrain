@@ -19,22 +19,17 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
 // Scale setup
 HX711 scale;
-HX711 scale2;
 uint8_t dataPin = 5;
 uint8_t clockPin = 6;
-uint8_t dataPin2 = 11;
-uint8_t clockPin2 = 12;
 // This is the calibration value for each load cell, you need to calibrate
 // them with a known weight The good thing is that the value is linear so if
 // you know something weights 100g you can calculate what the value should be.
-#define scaleCalibration 2371
-#define scaleCalibration2 1793
+#define scaleCalibration 170
 
 
 
 // the variable to hold a value for each load cell (float because it is a decimal)
 float w1;
-float w2;
 
 // Weight control variables
 int currentWeight;
@@ -102,17 +97,14 @@ bool turnDetected = false;
 
 // The Relays
 int pump = 9;
-int valve = 10;
 
 // Helper functions that turn the relays on and off
 void extractOn() {
   digitalWrite(pump, HIGH);
-  digitalWrite(valve, HIGH);
 }
 
 void extractOff() {
   digitalWrite(pump, LOW);
-  digitalWrite(valve, LOW);
 }
 
 
@@ -325,7 +317,6 @@ void setup() {
 
   // setting up the relays
   pinMode(pump, OUTPUT);
-  pinMode(valve, OUTPUT);
 
   // making sure the pump and valve are off, probably dont need but just in case
   extractOff();
@@ -344,15 +335,12 @@ void setup() {
 
   // This initializes the scales
   scale.begin(dataPin, clockPin);
-  scale2.begin(dataPin2, clockPin2);
 
   // Calibrate to initially weighted value
   scale.set_scale(scaleCalibration);
-  scale2.set_scale(scaleCalibration2);
 
   // set the scales to 0
   scale.tare();
-  scale2.tare();
 
   // Set the state of the system
   preStarted = true;
@@ -434,7 +422,7 @@ void loop() {
      e.g you can change it to 5s if you update your reached interval value to 5000 at the top.
      currentTime - previousTime >= reachedInterval
   */
-  if (weightReached && currentFlow < 10) {
+  if (weightReached && currentFlow < 30) {
     started = 0;
     weightReached = false;
     preStarted = true;
@@ -457,9 +445,8 @@ void loop() {
 */
 void scaleFunc() {
   w1 = scale.get_units();
-  w2 = scale2.get_units();
-  if ((w1 + w2) > 1) {
-    currentWeight = round((w1 * 100 + w2 * 100));
+  if ((w1) > 1) {
+    currentWeight = round((w1 * 100));
   }
 }
 
@@ -468,8 +455,7 @@ void scaleFunc() {
 */
 void precisionScale() {
   w1 = scale.get_units(2);
-  w2 = scale2.get_units(2);
-  currentWeight = round((w1 * 100 + w2 * 100));
+  currentWeight = round((w1 * 100));
 }
 
 /*
@@ -477,7 +463,6 @@ void precisionScale() {
 */
 void tareScales() {
   scale.tare();
-  scale2.tare();
 }
 
 /*
@@ -561,7 +546,7 @@ void writeWeightOffset() {
 
   // Write the average of both values to EEPROM in decigrams
   if (abs(deltaOffset) > offsetPrecision) {
-    int writeOffset = ((currentOffset + offset) / 2) / 10;
+    int writeOffset = (currentOffset + offset) / 10;
     writeOffset = writeOffset != 255 ? writeOffset : 254;
     EEPROM.write(hashLastFlow(), writeOffset);
   }

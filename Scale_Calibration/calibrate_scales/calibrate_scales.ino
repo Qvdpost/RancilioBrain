@@ -16,7 +16,7 @@ HX711 scale;
 uint8_t dataPin = 11;
 uint8_t clockPin = 12;
 
-int callibration_weight = 95;
+float callibration_weight = 30.8;
 
 
 void setup()
@@ -25,7 +25,7 @@ void setup()
 
   scale.begin(dataPin, clockPin);
 
-  scale.set_scale();
+  scale.set_scale(1000);
 
   Serial.print("UNITS: ");
   Serial.println(scale.get_units());
