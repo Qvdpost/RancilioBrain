@@ -27,8 +27,8 @@ uint8_t clockPin2 = 12;
 // This is the calibration value for each load cell, you need to calibrate
 // them with a known weight The good thing is that the value is linear so if
 // you know something weights 100g you can calculate what the value should be.
-#define scaleCalibration 2371
-#define scaleCalibration2 1793
+#define scaleCalibration 2040.54
+#define scaleCalibration2 1986.60
 
 
 
@@ -130,7 +130,7 @@ void preStartedDisplay() {
   display.setTextColor(SSD1306_WHITE); // Draw white text
   display.setCursor(0, 0);
   display.print("Target Weight");
-  display.setTextSize(3);
+  display.setTextSize(2);
   display.setTextColor(SSD1306_WHITE); // Draw white text
   display.setCursor(0, 14);
   display.print(targetWeight * 0.01, 1);
@@ -140,12 +140,20 @@ void preStartedDisplay() {
   if (tV != 0) {
     display.setTextSize(1); // this is size..  1 is 8 pixels tall, 2 is 16, and so on
     display.setTextColor(SSD1306_WHITE); // Draw white text
-    display.setCursor(0, 44); // this is position in (x,y)
+    display.setCursor(0, 32); // this is position in (x,y)
     display.print("Previous Weight"); //display.print sends this to buffer
     display.setTextSize(1);
     display.setTextColor(SSD1306_WHITE); // Draw white text
-    display.setCursor(98, 44);
+    display.setCursor(98, 32);
     display.print(lastWeight * 0.01, 1);
+    display.setTextSize(1); 
+    display.setTextColor(SSD1306_WHITE); // Draw white text
+    display.setCursor(0, 44); 
+    display.print("Previous Flow"); 
+    display.setTextSize(1);
+    display.setTextColor(SSD1306_WHITE); // Draw white text
+    display.setCursor(98, 44);
+    display.print(lastFlow * 0.01, 1);
     display.setTextSize(1);
     display.setTextColor(SSD1306_WHITE); // Draw white text
     display.setCursor(0, 56);
@@ -174,10 +182,14 @@ void startedDisplay() {
   display.setTextColor(SSD1306_WHITE); // Draw white text
   display.setCursor(0, 22);
   display.print("Weight");
-  display.setTextSize(2);
+  display.setTextSize(1);
   display.setTextColor(SSD1306_WHITE); // Draw white text
   display.setCursor(80, 22);
   display.print(currentWeight * 0.01, 1);
+  display.setTextSize(1);
+  display.setTextColor(SSD1306_WHITE); // Draw white text
+  display.setCursor(80, 34);
+  display.print(currentFlow * 0.01, 1);
   display.setTextSize(2);
   display.setTextColor(SSD1306_WHITE); // Draw white text
   display.setCursor(0, 46);
@@ -205,10 +217,14 @@ void justEndedDisplay() {
   display.setTextColor(SSD1306_WHITE); // Draw white text
   display.setCursor(0, 22);
   display.print("Weight");
-  display.setTextSize(2);
+  display.setTextSize(1);
   display.setTextColor(SSD1306_WHITE); // Draw white text
   display.setCursor(80, 22);
   display.print(lastWeight * 0.01, 1);
+  display.setTextSize(1);
+  display.setTextColor(SSD1306_WHITE); // Draw white text
+  display.setCursor(80, 34);
+  display.print(lastFlow * 0.01, 1);
   display.setTextSize(2);
   display.setTextColor(SSD1306_WHITE); // Draw white text
   display.setCursor(0, 46);
@@ -270,6 +286,7 @@ void buttonDetect() {
       delay(250);
       tV = 0;
       currentWeight = 0;
+      lastFlow = 0;
       elapsedTime = 0;
       preStarted = false;
       started = true;
@@ -368,7 +385,7 @@ void loop() {
     scaleFunc();
   }
   // check to see if the shot just ended and switch to doing multiple averaged readings for more accuracy
-  if ((preStarted == false) && (weightReached)) {
+  else if ((preStarted == false) && (weightReached)) {
     precisionScale();
   }
 
@@ -380,6 +397,12 @@ void loop() {
   // Updates the time and weight value while the extraction is happening
   if (started) {
     updateWeightFlow();
+    
+    // this is to only start counting extraction time from the first drips into the cup
+    if (currentWeight < 1) {
+      startCounting = currentTime;
+    }
+    
     if (!weightReached) {
       elapsedTime = currentTime - startCounting;
       tV = elapsedTime;
@@ -387,6 +410,26 @@ void loop() {
       display.clearDisplay();
       startedDisplay();
       display.display();
+    }
+  }
+
+  // This is the code to stop the extraction once the target weight is reached.
+  // I added the conditional to only runs 5s after extraction starts because
+  // sometimes you need to reposition your cup and that would trip
+  // the weight and stop extraction and ruin your shot :(
+
+  if (tV > 2000) {
+    readWeightOffset();
+    if ((currentWeight) > (targetWeight - weightOffset)) {
+      lastWeight = currentWeight;
+      if (lastFlow == 0) {
+        lastFlow = currentFlow;
+      }
+      weightReached = true;
+      if (storedWeight != targetWeight) {
+        storedWeight = targetWeight;
+        EEPROM.put(0, storedWeight);
+      }
     }
   }
 
@@ -399,9 +442,18 @@ void loop() {
     if (currentWeight > lastWeight) {
       lastWeight = currentWeight;
     }
-    if (lastFlow == 0) {
-      lastFlow = currentFlow;
-    }
+  }
+
+  /* this code runs after your weight is reached AND a certain extra
+     amount of time has passed, you know for the last few drips...
+  */
+  if (weightReached && currentFlow < 20) {
+    started = 0;
+    weightReached = false;
+    preStarted = true;
+    writeWeightOffset();
+    clearWeightFlow();
+    currentWeight = 0;
   }
 
   // Goes back to the initial standby screen when you are finished extracting so you can set another weight
@@ -411,38 +463,6 @@ void loop() {
     display.display();
   }
 
-  // This is the code to stop the extraction once the target weight is reached.
-  // I added the conditional to only runs 5s after extraction starts because
-  // sometimes you need to reposition your cup and that would trip
-  // the weight and stop extraction and ruin your shot :(
-
-  if (tV > 5000) {
-    readWeightOffset();
-    if ((currentWeight) > (targetWeight - weightOffset)) {
-      lastWeight = currentWeight;
-      weightReached = true;
-      if (storedWeight != targetWeight) {
-        storedWeight = targetWeight;
-        EEPROM.put(0, storedWeight);
-      }
-    }
-  }
-
-  /* this code runs after your weight is reached AND a certain extra
-     amount of time has passed, you know for the last few drips...
-     it resets the states so you are ready to brew again...
-     e.g you can change it to 5s if you update your reached interval value to 5000 at the top.
-     currentTime - previousTime >= reachedInterval
-  */
-  if (weightReached && currentFlow < 10) {
-    started = 0;
-    weightReached = false;
-    preStarted = true;
-    writeWeightOffset();
-    clearWeightFlow();
-    lastFlow = 0;
-    currentWeight = 0;
-  }
 }
 
 // --------------//--------------//--------------//--------------//--------------//--------------//--------------//--------------//--------------//--------------
@@ -456,7 +476,7 @@ void loop() {
    This asks the scales to get the weight and add them up
 */
 void scaleFunc() {
-  w1 = scale.get_units();
+  w1 = scale.get_units() + 0.6;
   w2 = scale2.get_units();
   if ((w1 + w2) > 1) {
     currentWeight = round((w1 * 100 + w2 * 100));
@@ -467,7 +487,7 @@ void scaleFunc() {
    This asks the scales to check the weight twice so in theory its more accurate, this is how the shot is weighed just after the pump is off
 */
 void precisionScale() {
-  w1 = scale.get_units(2);
+  w1 = scale.get_units(2) + 0.6;
   w2 = scale2.get_units(2);
   currentWeight = round((w1 * 100 + w2 * 100));
 }
@@ -553,16 +573,25 @@ void writeWeightOffset() {
   /* The final weight was less than the weight during extraction (e.g. someone took away the cup)
      Or the overflow too great (e.g. someone leaned on the scale)
   */
-  if (currentOffset <= 0 || currentOffset > 1.5 * targetWeight) {
+  if (currentWeight < lastWeight - offsetPrecision || currentOffset > 1.5 * targetWeight) {
     return;
   }
 
   int deltaOffset = currentOffset - offset;
 
-  // Write the average of both values to EEPROM in decigrams
+  // Write the offset to EEPROM in decigrams
   if (abs(deltaOffset) > offsetPrecision) {
-    int writeOffset = ((currentOffset + offset) / 2) / 10;
-    writeOffset = writeOffset != 255 ? writeOffset : 254;
-    EEPROM.write(hashLastFlow(), writeOffset);
+    // Convert offset to decigrams
+    currentOffset = currentOffset / 10;
+
+    // 255 is reserved for unset values so 254 is chosen if the value is 255 or higher due to EEPROM limitations
+    currentOffset = currentOffset < 255 ? currentOffset : 254;
+
+    // if extraction stopped too early subtract it (add a negative value) to the offset
+    if (currentOffset < 0) {
+      currentOffset = max(0, offset + currentOffset);
+    }
+    
+    EEPROM.write(hashLastFlow(), currentOffset);
   }
 }

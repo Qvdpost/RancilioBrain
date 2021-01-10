@@ -13,10 +13,10 @@
 
 HX711 scale;
 
-uint8_t dataPin = 11;
-uint8_t clockPin = 12;
+uint8_t dataPin = 5;
+uint8_t clockPin = 6;
 
-float callibration_weight = 30.8;
+float callibration_weight = 139;
 
 
 void setup()
