@@ -48,15 +48,15 @@ int weightOffset = 0; // This value is how many decigrams before the target shou
    Macros and globals needed for the offset hashtable based on flowrate
 */
 // The interval over which the flow is calculated
-#define flowTime 2
-// Maximum flowrate to remember offset for in centigrams per second
+#define flowTime 4
+// Maximum flowrate to remember offset for, in centigrams per second
 #define maxFlow 500
 // Flow rate bucketsize in centigrams per second
 #define flowInterval 20
 // starting postion in EEPROM to write the offset hashtable
 #define hashOffset 10
-// Delta in offsets to warrant a new write to EEPROM
-#define offsetPrecision 20
+// Delta in offsets to warrant a new write to EEPROM in centigrams
+#define offsetPrecision 50
 
 int hashMax = maxFlow / flowInterval;
 int hashStep = flowInterval;
@@ -447,7 +447,7 @@ void loop() {
   /* this code runs after your weight is reached AND a certain extra
      amount of time has passed, you know for the last few drips...
   */
-  if (weightReached && currentFlow < 20) {
+  if (weightReached && currentFlow < 5) {
     started = 0;
     weightReached = false;
     preStarted = true;
@@ -587,10 +587,8 @@ void writeWeightOffset() {
     // 255 is reserved for unset values so 254 is chosen if the value is 255 or higher due to EEPROM limitations
     currentOffset = currentOffset < 255 ? currentOffset : 254;
 
-    // if extraction stopped too early subtract it (add a negative value) to the offset
-    if (currentOffset < 0) {
-      currentOffset = max(0, offset + currentOffset);
-    }
+    // new offset is the sum of old plus new (negative if stopped too early)
+    currentOffset = max(0, offset + currentOffset);
     
     EEPROM.write(hashLastFlow(), currentOffset);
   }
