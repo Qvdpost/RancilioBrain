@@ -134,6 +134,7 @@ void preStartedDisplay() {
   display.setTextColor(SSD1306_WHITE); // Draw white text
   display.setCursor(0, 14);
   display.print(targetWeight * 0.01, 1);
+  display.print(" g");
 
 
   // if you've pulled a shot already put the info on screen (if TV isnt 0 you've pulled a shot)
@@ -141,27 +142,30 @@ void preStartedDisplay() {
     display.setTextSize(1); // this is size..  1 is 8 pixels tall, 2 is 16, and so on
     display.setTextColor(SSD1306_WHITE); // Draw white text
     display.setCursor(0, 32); // this is position in (x,y)
-    display.print("Previous Weight"); //display.print sends this to buffer
+    display.print("Prev Weight"); //display.print sends this to buffer
     display.setTextSize(1);
     display.setTextColor(SSD1306_WHITE); // Draw white text
-    display.setCursor(98, 32);
+    display.setCursor(82, 32);
     display.print(lastWeight * 0.01, 1);
+    display.print(" g");
     display.setTextSize(1); 
     display.setTextColor(SSD1306_WHITE); // Draw white text
     display.setCursor(0, 44); 
-    display.print("Previous Flow"); 
+    display.print("Prev Flow"); 
     display.setTextSize(1);
     display.setTextColor(SSD1306_WHITE); // Draw white text
-    display.setCursor(98, 44);
+    display.setCursor(82, 44);
     display.print(lastFlow * 0.01, 1);
+    display.print(" g/s");
     display.setTextSize(1);
     display.setTextColor(SSD1306_WHITE); // Draw white text
     display.setCursor(0, 56);
-    display.print("Previous Time");
+    display.print("Prev Time");
     display.setTextSize(1);
     display.setTextColor(SSD1306_WHITE); // Draw white text
-    display.setCursor(98, 56);
+    display.setCursor(82, 56);
     display.print(tV / 1000.0, 1);
+    display.print(" s");
   }
 }
 
@@ -178,6 +182,7 @@ void startedDisplay() {
   display.setTextColor(SSD1306_WHITE); // Draw white text
   display.setCursor(85, 0);
   display.print(targetWeight * 0.01, 1);
+  display.print(" g");
   display.setTextSize(2);
   display.setTextColor(SSD1306_WHITE); // Draw white text
   display.setCursor(0, 22);
@@ -186,10 +191,12 @@ void startedDisplay() {
   display.setTextColor(SSD1306_WHITE); // Draw white text
   display.setCursor(80, 22);
   display.print(currentWeight * 0.01, 1);
+  display.print(" g");
   display.setTextSize(1);
   display.setTextColor(SSD1306_WHITE); // Draw white text
   display.setCursor(80, 34);
   display.print(currentFlow * 0.01, 1);
+  display.print(" g/s");
   display.setTextSize(2);
   display.setTextColor(SSD1306_WHITE); // Draw white text
   display.setCursor(0, 46);
@@ -198,6 +205,7 @@ void startedDisplay() {
   display.setTextColor(SSD1306_WHITE); // Draw white text
   display.setCursor(80, 46);
   display.print(tV / 1000.0, 1);
+  display.print(" s");
 }
 
 /*
@@ -213,6 +221,7 @@ void justEndedDisplay() {
   display.setTextColor(SSD1306_WHITE); // Draw white text
   display.setCursor(85, 0);
   display.print(targetWeight * 0.01, 1);
+  display.print(" g");
   display.setTextSize(2);
   display.setTextColor(SSD1306_WHITE); // Draw white text
   display.setCursor(0, 22);
@@ -221,10 +230,12 @@ void justEndedDisplay() {
   display.setTextColor(SSD1306_WHITE); // Draw white text
   display.setCursor(80, 22);
   display.print(lastWeight * 0.01, 1);
+  display.print(" g");
   display.setTextSize(1);
   display.setTextColor(SSD1306_WHITE); // Draw white text
   display.setCursor(80, 34);
   display.print(lastFlow * 0.01, 1);
+  display.print(" g/s");
   display.setTextSize(2);
   display.setTextColor(SSD1306_WHITE); // Draw white text
   display.setCursor(0, 46);
@@ -233,6 +244,7 @@ void justEndedDisplay() {
   display.setTextColor(SSD1306_WHITE); // Draw white text
   display.setCursor(80, 46);
   display.print(tV / 1000.0, 1);
+  display.print(" s");
 
 }
 
@@ -447,7 +459,7 @@ void loop() {
   /* this code runs after your weight is reached AND a certain extra
      amount of time has passed, you know for the last few drips...
   */
-  if (weightReached && currentFlow < 5) {
+  if (weightReached && currentFlow < 10) {
     started = 0;
     weightReached = false;
     preStarted = true;
